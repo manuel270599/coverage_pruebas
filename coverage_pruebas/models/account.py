@@ -2,6 +2,7 @@
 Clase Account
 """
 import logging
+from sqlalchemy.orm import Session
 from sqlalchemy.sql import func
 from models import db
 
@@ -72,4 +73,6 @@ class Account(db.Model):
         :rtype: Account
         """
         logger.info("Buscando cuenta con id %s ...", account_id)
-        return cls.query.get(account_id)
+        # Utilizar un bloque with para asegurar que la sesión se cierre correctamente
+        with Session(db.engine) as session:
+            return session.get(cls, account_id)

@@ -4,6 +4,7 @@ import pytest
 import sys
 import os
 import datetime
+from models.account import Account, DataValidationError
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from models import db
 from models.account import Account
@@ -95,3 +96,79 @@ class TestAccountModel:
            datetime.datetime.fromisoformat(str(result["date_joined"]))
         except ValueError:
             assert False, f"'date_joined' no está en formato ISO: {result['date_joined']}"
+
+
+
+
+    def test_from_dict(self):
+        """Prueba establecer atributos de una cuenta desde un diccionario"""
+        # Seleccionar un índice aleatorio válido
+        random_key = random.randint(0, len(ACCOUNT_DATA) - 1) # usa import random
+        # Obtener los datos de la cuenta seleccionada
+        data = ACCOUNT_DATA[random_key]
+        # Crear una instancia de Account sin establecer atributos
+        account = Account()
+        # Utilizar el método from_dict() para establecer los atributos desde el diccionario
+        account.from_dict(data)
+        # Verificar que los atributos de la instancia coinciden con los valores del diccionario
+        assert account.name == data["name"], f"Nombre esperado: {data['name']}, obtenido: {account.name}"
+        assert account.email == data["email"], f"Email esperado: {data['email']}, obtenido: {account.email}"
+        assert account.phone_number == data["phone_number"], f"Número de teléfono esperado: {data['phone_number']}, obtenido: {account.phone_number}"
+        assert account.disabled == data["disabled"], f"Estado 'disabled' esperado: {data['disabled']}, obtenido: {account.disabled}"
+        # Opcional: Verificar que 'date_joined' no ha sido establecido por from_dict()
+        # ya que este campo generalmente se establece automáticamente al crear la cuenta
+        assert account.date_joined is None, f"'date_joined' debería ser None, obtenido: {account.date_joined}"
+
+    def test_update_account(self):
+        """Prueba la actualización de una cuenta utilizando datos conocidos"""
+        # Seleccionar un índice aleatorio válido
+        random_key = random.randint(0, len(ACCOUNT_DATA) - 1)
+        # Obtener los datos de la cuenta seleccionada
+        data = ACCOUNT_DATA[random_key]
+        # Crear una instancia de Account con los datos seleccionados
+        account = Account(**data)
+        # Guardar la cuenta en la base de datos
+        account.create()
+        # Verificar que la cuenta ha sido asignada un ID
+        assert account.id is not None, "La cuenta no fue creada correctamente y no tiene un ID asignado."
+        # Modificar uno de los atributos de la cuenta
+        original_name = account.name
+        account.name = "Rumpelstiltskin"
+        # Ejecutar el método update() para guardar los cambios en la base de datos
+        account.update()
+        # Recuperar la cuenta actualizada desde la base de datos
+        found_account = Account.find(account.id)
+        # Verificar que el atributo 'name' ha sido actualizado correctamente
+        assert found_account.name == account.name, (
+                    f"Se esperaba que el nombre fuera '{account.name}', pero se obtuvo '{found_account.name}'."
+                )
+
+        # Verificar que otros atributos no han sido alterados
+        assert found_account.email == data["email"], (
+                    f"El email no debería haber cambiado. Se esperaba '{data['email']}', pero se obtuvo '{found_account.email}'."
+                )
+        assert found_account.phone_number == data["phone_number"], (
+                    f"El número de teléfono no debería haber cambiado. Se esperaba '{data['phone_number']}', pero se obtuvo '{found_account.phone_number}'."
+                )
+        assert found_account.disabled == data["disabled"], (
+                    f"El estado 'disabled' no debería haber cambiado. Se esperaba '{data['disabled']}', pero se obtuvo '{found_account.disabled}'."
+                )
+
+    def test_update_invalid_id(self):
+        """Prueba la actualización de una cuenta con ID inválido"""
+        random_key = random.randint(0, len(ACCOUNT_DATA) - 1)# usa import random
+        data = ACCOUNT_DATA[random_key]  
+        account = Account(**data)
+        account.id = None
+        with pytest.raises(DataValidationError):
+            account.update()
+
+    def test_delete_account(self):
+        """Prueba la eliminación de una cuenta utilizando datos conocidos"""
+        random_key = random.randint(0, len(ACCOUNT_DATA) - 1)# usa import random
+        data = ACCOUNT_DATA[random_key]  # obtener una cuenta aleatoria
+        account = Account(**data)
+        account.create()
+        assert len(Account.all()) == 1
+        account.delete()
+        assert len(Account.all()) == 0
